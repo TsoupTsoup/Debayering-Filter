@@ -1,0 +1,85 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use work.image_types.all;
+
+entity data_bank is
+    generic ( N : integer := 1024 );  --dimensions of image
+    
+    Port ( clk : in STD_LOGIC;
+           RESET : in STD_LOGIC;
+           valid_in : in STD_LOGIC;
+           pixel_in : in STD_LOGIC_VECTOR (7 downto 0);
+           boundaries : in STD_LOGIC_VECTOR (3 downto 0); --ACTIVE HIGH: (0) for row0, (1) for rowN-1, (2) for column(0), (3) for columnN-1
+           window_out : out window_3x3);
+end data_bank;
+
+architecture hybrid of data_bank is
+
+    component line_buffer_fifo is
+        port (
+            clk   : in  std_logic;
+            srst  : in  std_logic;
+            din   : in  std_logic_vector(7 downto 0);
+            wr_en : in  std_logic;
+            rd_en : in  std_logic;
+            dout  : out std_logic_vector(7 downto 0);
+            full  : out std_logic;
+            empty : out std_logic
+        );
+    end component;
+    
+    --to hold (intermediate) FIFO outputs
+    signal dummy1 : std_logic_vector(7 downto 0);
+    signal dummy2 : std_logic_vector(7 downto 0);
+    signal dummy3 : std_logic_vector(7 downto 0);
+    
+    signal window_dummy : window_3x3;
+    signal not_RESET : std_logic;
+    signal en1,en2,en3 : std_logic;   --to enable the reading from each FIFO
+    signal FIFO_con1,FIFO_con2,FIFO_con3 : std_logic;
+begin
+    FIFO_con1<=en1 and valid_in;
+    FIFO_con2<=en2 and valid_in;
+    FIFO_con3<=en3 and valid_in;
+    not_RESET<=not(RESET);
+
+    --the 3 FIFOs
+    x0: line_buffer_fifo port map (clk=>clk,srst=>not_RESET,din=>pixel_in,wr_en=>valid_in,rd_en=>FIFO_con1,dout=>dummy1,full=>open,empty=>open);
+    x1: line_buffer_fifo port map (clk=>clk,srst=>not_RESET,din=>dummy1,wr_en=>FIFO_con1,rd_en=>FIFO_con2,dout=>dummy2,full=>open,empty=>open);
+    x2: line_buffer_fifo port map (clk=>clk,srst=>not_RESET,din=>dummy2,wr_en=>FIFO_con2,rd_en=>FIFO_con3,dout=>dummy3,full=>open,empty=>open);
+    
+    --update the 3x3 window and output the data
+    data_push: process(Clk,RESET)
+    variable counter : integer range 0 to 3*N := 0; 
+    
+    begin
+        if(RESET='0') then counter:=0; en1<='0'; en2<='0'; en3<='0';
+        elsif(rising_edge(Clk)) then
+            if(valid_in='1') then
+                window_dummy(2)<=window_dummy(1);   window_out(2)<=window_dummy(1);
+                window_dummy(1)<=window_dummy(0);   window_out(1)<=window_dummy(0);
+                window_dummy(0)<=dummy1;            window_out(0)<=dummy1;
+                
+                window_dummy(5)<=window_dummy(4);   window_out(5)<=window_dummy(4);
+                window_dummy(4)<=window_dummy(3);   window_out(4)<=window_dummy(3);
+                window_dummy(3)<=dummy2;            window_out(3)<=dummy2;
+                
+                window_dummy(8)<=window_dummy(7);   window_out(8)<=window_dummy(7);
+                window_dummy(7)<=window_dummy(6);   window_out(7)<=window_dummy(6);
+                window_dummy(6)<=dummy3;            window_out(6)<=dummy3;
+                
+                if(boundaries(0)='1') then window_out(8)<=x"00"; window_out(7)<=x"00"; window_out(6)<=x"00"; end if;
+                if(boundaries(1)='1') then window_out(2)<=x"00"; window_out(1)<=x"00"; window_out(0)<=x"00"; end if;
+                if(boundaries(2)='1') then window_out(8)<=x"00"; window_out(5)<=x"00"; window_out(2)<=x"00"; end if;
+                if(boundaries(3)='1') then window_out(6)<=x"00"; window_out(3)<=x"00"; window_out(0)<=x"00"; end if;
+                
+                if(counter<3*N) then counter := counter + 1; end if;
+                if(counter=N) then en1<='1';
+                elsif(counter=2*N) then en2<='1';
+                elsif(counter=3*N) then en3<='1';
+                end if;
+            end if;
+        end if;
+     end process data_push; 
+             
+end hybrid;
