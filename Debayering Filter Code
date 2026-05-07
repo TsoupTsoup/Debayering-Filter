@@ -1,0 +1,108 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+package image_types is
+    type window_3x3 is array (0 to 8) of std_logic_vector(7 downto 0);
+end package image_types;
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+use work.image_types.all;
+
+entity Debayering_Filter is
+    generic ( N : integer := 1024 );
+    
+    Port ( Clk : in STD_LOGIC;
+           new_image : in STD_LOGIC;
+           valid_in : in STD_LOGIC;
+           pixel : in STD_LOGIC_VECTOR (7 downto 0);
+           RESET : in STD_LOGIC;
+           image_finished : out STD_LOGIC;
+           valid_out : out STD_LOGIC;
+           R : out STD_LOGIC_VECTOR (7 downto 0);
+           G : out STD_LOGIC_VECTOR (7 downto 0);
+           B : out STD_LOGIC_VECTOR (7 downto 0)
+            );
+end Debayering_Filter;
+
+architecture hybrid of Debayering_Filter is
+
+    component control_unit is
+        generic ( N : integer := 1024 );
+        Port ( clk : in STD_LOGIC;
+           new_image : in STD_LOGIC;   --first pixel of a new image has arrived
+           valid_in : in STD_LOGIC;    --the input pixel is valid
+           RESET : in STD_LOGIC;
+           new_image_out : out STD_LOGIC := '0';  --for calculator unit (connects to calc_init)
+           valid_in_calc : out STD_LOGIC := '0';
+           valid_in_bank : out STD_LOGIC := '0';
+           boundaries : out STD_LOGIC_VECTOR(3 downto 0) := "0000";   --for data bank
+           color_case : out STD_LOGIC_VECTOR(1 downto 0) := "00";     --for calculator
+           image_finished : out STD_LOGIC := '0'
+           );
+     end component;
+     
+     component calculator is
+        Port ( clk : in STD_LOGIC;
+           RESET : in STD_LOGIC;       --asynchronous reset
+           calc_init : in STD_LOGIC;   --start new image processing
+           valid_in : in STD_LOGIC;    --valid pixel entered
+           window : in window_3x3;     --input for the 3x3 pixels needed
+           color_case : in STD_LOGIC_VECTOR (1 downto 0);   --input to determine one of the four cases
+           valid_out : out STD_LOGIC;  --output is valid
+           output_green : out std_logic_vector(7 downto 0);
+           output_red : out std_logic_vector(7 downto 0);
+           output_blue : out std_logic_vector(7 downto 0)
+           );
+     end component;
+     
+     component data_bank is
+        generic ( N : integer := 1024 );
+        Port ( clk : in STD_LOGIC;
+           RESET : in STD_LOGIC;
+           valid_in : in STD_LOGIC;
+           pixel_in : in STD_LOGIC_VECTOR (7 downto 0);
+           boundaries : in STD_LOGIC_VECTOR (3 downto 0); --ACTIVE HIGH: (0) for row0, (1) for rowN-1, (2) for column(0), (3) for columnN-1
+           window_out : out window_3x3);
+     end component;
+
+     signal new_image_out_dummy : STD_LOGIC := '0';  --for calculator unit (connects to calc_init)
+     signal valid_in_calc_dummy : STD_LOGIC := '0';
+     signal valid_in_bank_dummy : STD_LOGIC := '0';
+     signal boundaries_dummy : STD_LOGIC_VECTOR(3 downto 0) := "0000";   --for data bank
+     signal color_case_dummy : STD_LOGIC_VECTOR(1 downto 0) := "00";     --for calculator
+     signal image_finished_dummy : STD_LOGIC;
+     signal delay1,delay1_2 : STD_LOGIC;
+     signal delay2 : STD_LOGIC_VECTOR (7 downto 0);
+     signal delay3: STD_LOGIC_VECTOR (1 downto 0);
+     signal window_in_calc : window_3x3;
+          
+
+begin
+
+    C_U_call: control_unit generic map ( N => N )
+                           port map (Clk=>Clk, new_image=>new_image, valid_in=> valid_in, RESET=>RESET,
+                                     new_image_out=>new_image_out_dummy, valid_in_calc=>valid_in_calc_dummy, valid_in_bank=>valid_in_bank_dummy,
+                                     boundaries=>boundaries_dummy, color_case=>color_case_dummy, image_finished=>image_finished_dummy);
+                                     
+    calc_call: calculator port map (Clk=>Clk, RESET=>RESET, calc_init=>new_image_out_dummy, valid_in=>delay1, window=>window_in_calc, color_case=>delay3,
+                                    valid_out=>valid_out, output_red=>R, output_green=>G, output_blue=>B);
+    
+    bank_call: data_bank generic map ( N => N )
+                         port map (Clk=>Clk, RESET=>RESET, valid_in=>valid_in_bank_dummy, pixel_in=>delay2,
+                                   boundaries=>boundaries_dummy, window_out=>window_in_calc);
+    
+    --appropriate delays for the inputs and outputs
+    delays: process(Clk)
+    begin
+        if(rising_edge(CLK)) then
+            delay1<=valid_in_calc_dummy;
+            delay2<=pixel;
+            delay3<=color_case_dummy;
+            image_finished<=image_finished_dummy;
+        end if;
+    end process delays;
+        
+end hybrid;
