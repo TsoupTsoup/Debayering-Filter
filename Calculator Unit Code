@@ -1,0 +1,102 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+entity control_unit is
+    generic ( N : integer := 1024 );  --dimensions of image
+    Port ( clk : in STD_LOGIC;
+           new_image : in STD_LOGIC;   --first pixel of a new image has arrived
+           valid_in : in STD_LOGIC;    --the input pixel is valid
+           RESET : in STD_LOGIC;
+           new_image_out : out STD_LOGIC := '0';  --for calculator unit (connects to calc_init)
+           valid_in_calc : out STD_LOGIC := '0';
+           valid_in_bank : out STD_LOGIC := '0';
+           boundaries : out STD_LOGIC_VECTOR(3 downto 0) := "0000";   --for data bank
+           color_case : out STD_LOGIC_VECTOR(1 downto 0) := "00";     --for calculator
+           image_finished : out STD_LOGIC := '0'
+    );
+end control_unit;
+
+architecture behavioral of control_unit is
+
+begin
+
+    fsm: process(Clk,RESET)
+        variable new_image_lock : std_logic := '0';
+        variable valid_in_lock : std_logic := '0';
+        variable counter : integer range 0 to N*N+5 := 0;   --counts the number of pixels received
+        variable counter_f : integer range 0 to 2*N+5 := 0;   --counts how many calcs needed after last pixel arrives
+        variable row : integer range 0 to N := 0;   --row counter
+        variable column : integer range 0 to N := 0;   --column counter
+        variable boundaries_dummy : std_logic_vector(3 downto 0) := "0000";
+    
+    begin
+        if(RESET='0') then new_image_lock:='0'; valid_in_lock:='0'; counter:=0; counter_f:=0; column:=0; row:=1;
+                           new_image_out<='1'; valid_in_calc<='0'; valid_in_bank<='0'; image_finished<='0';
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------
+        elsif(rising_edge(CLK)) then
+            --to handle new image arrivals
+            if(new_image='1' and new_image_lock='0') then new_image_out<='1'; new_image_lock:='1'; counter:=0; counter_f:=0; column:=0; row:=1;  --lock
+            elsif(new_image_lock='1') then new_image_out<='0'; if(new_image='0') then new_image_lock:='0'; end if;                               --reset and unlock    
+            end if;
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------       
+            --to handle new pixel arrivals
+            if (counter < N*N) then
+                -- STATE A: Actively receiving pixels
+                if(valid_in='1') then valid_in_bank<='1'; counter:=counter+1;
+                    if(counter > 2*N+1) then 
+                        valid_in_calc<='1';    
+                        -- update row-column counters
+                        if(column=N) then column:=1; row:=row+1;
+                        else column := column + 1;
+                        end if;  
+                    else valid_in_calc<='0';
+                    end if;
+                
+                -- Pause pipeline if valid_in drops mid-image    
+                else
+                    valid_in_bank<='0'; valid_in_calc<='0';
+                end if;
+
+            -- STATE B: All pixels received, flush the pipeline
+            else
+                if(counter_f = 2*N+2) then valid_in_bank<='0'; valid_in_calc<='0'; image_finished<='0';  -- Pull down after 1 cycle
+                else valid_in_bank<='1'; valid_in_calc<='1'; counter_f:=counter_f+1;
+                    -- update row-column counters during flush
+                     if(column=N) then column:=1; row:=row+1;
+                     else column := column + 1;
+                     end if;
+                     
+                     if(counter_f = 2*N+2) then 
+                         image_finished<='1'; 
+                         valid_in_calc<='0'; 
+                     end if;
+                end if;
+            end if;
+         ---------------------------------------------------------------------------------------------------------------------------------------------------------
+            boundaries_dummy:="0000";
+            
+            if(row=1) then boundaries_dummy(0):='1';
+            elsif(row=N) then boundaries_dummy(1):='1';
+            end if;
+            
+            if(column=1) then boundaries_dummy(2):='1';
+            elsif(column=N) then boundaries_dummy(3):='1';
+            end if;
+            
+            boundaries<=boundaries_dummy;
+         ---------------------------------------------------------------------------------------------------------------------------------------------------------
+            if(row mod 2 = 1) then
+                if(column mod 2 = 1) then color_case<="01";
+                else color_case<="11";
+                end if;
+            else
+                if(column mod 2 = 1) then color_case<="10";
+                else color_case<="00";
+                end if;
+           end if;    
+           
+        end if;
+     end process fsm;
+            
+end behavioral;
