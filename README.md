@@ -2,6 +2,9 @@
 Implementation of a Debayering Filter using VHDL and Vivado.
 The filter assumes that the pattern of the input image is GBRG (green, blue, red, green) and generates the output image in RGB for each pixel.
 The filter can work for any image size via the N parameter (eg for N=1024 we get an input image of 1024x1024 pixels).
+The interface of the filter is shown below.
+<img width="399" height="249" alt="image" src="https://github.com/user-attachments/assets/c07a4405-ebd5-42dd-83d8-de7356e4c4ba" />
+
 
 The architecture of the filter is comprised of 3 units:
 
@@ -47,7 +50,7 @@ After 2*N+2+2 cycles, the first output pixel is ready.
 We can see that even if the valid_in signal (that the filter receives from the external device, indicating that the input pixel is valid and allowing the filter to receive it) is '0', the system just stalls until is becomes '1' (until a valid pixel arrives).
 
 <img width="1544" height="705" alt="Screenshot 2026-05-07 152020" src="https://github.com/user-attachments/assets/30729da0-b6b4-45ad-90bf-dfde8c3f289b" />
-The systems finishes it's operation and the 'image_finished' signal is raised.
+The system finishes its operation and the 'image_finished' signal is raised.
 
 
 
