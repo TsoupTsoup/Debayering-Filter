@@ -1,0 +1,68 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+package image_types is
+    type window_3x3 is array (0 to 8) of std_logic_vector(7 downto 0);
+end package image_types;
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+use work.image_types.all;
+
+entity calculator is
+    Port ( clk : in STD_LOGIC;
+           RESET : in STD_LOGIC;       --asynchronous reset
+           calc_init : in STD_LOGIC;   --start new image processing
+           valid_in : in STD_LOGIC;    --valid pixel entered
+           window : in window_3x3;     --input for the 3x3 pixels needed
+           color_case : in STD_LOGIC_VECTOR (1 downto 0);   --input to determine one of the four cases
+           valid_out : out STD_LOGIC;  --output is valid
+           output_green : out std_logic_vector(7 downto 0);
+           output_red : out std_logic_vector(7 downto 0);
+           output_blue : out std_logic_vector(7 downto 0)
+           );
+end calculator;
+
+architecture behavioral of calculator is
+    
+begin
+
+    new_calc: process(Clk,RESET)
+    begin
+        if(RESET='0') then valid_out<='0';
+        elsif(rising_edge(Clk)) then
+            if(calc_init='1') then valid_out<='0';
+            elsif(valid_in='1') then
+                case(color_case) is     --calculate colors
+                    when "00" =>     --case 'i'
+                        output_green <= window(4);     --pass green to output
+                        output_red <= std_logic_vector(resize(shift_right(resize(unsigned(window(3)),9) + resize(unsigned(window(5)),9),1),8));   --calculate red
+                        output_blue <= std_logic_vector(resize(shift_right(resize(unsigned(window(1)),9) + resize(unsigned(window(7)),9),1),8));  --calculate blue
+                    when "01" =>     --case 'ii'
+                        output_green <= window(4);     --pass green to output
+                        output_red <= std_logic_vector(resize(shift_right(resize(unsigned(window(1)),9) + resize(unsigned(window(7)),9),1),8));   --calculate red
+                        output_blue <= std_logic_vector(resize(shift_right(resize(unsigned(window(3)),9) + resize(unsigned(window(5)),9),1),8));  --calculate blue
+                    when "10" =>     --case 'iii'
+                        output_red <= window(4);       --pass red to output
+                        output_green <= std_logic_vector(resize(shift_right(resize(unsigned(window(1)),10) + resize(unsigned(window(3)),10)
+                                        + resize(unsigned(window(5)),10) + resize(unsigned(window(7)),10), 2), 8));      --calculate green
+                        output_blue <= std_logic_vector(resize(shift_right(resize(unsigned(window(0)),10) + resize(unsigned(window(2)),10)
+                                        + resize(unsigned(window(6)),10) + resize(unsigned(window(8)),10), 2), 8));      --calculate blue               
+                    when "11" =>     --case 'iv'
+                        output_blue <= window(4);       --pass blue to output
+                        output_green <= std_logic_vector(resize(shift_right(resize(unsigned(window(1)),10) + resize(unsigned(window(3)),10)
+                                        + resize(unsigned(window(5)),10) + resize(unsigned(window(7)),10), 2), 8));      --calculate green
+                        output_red <= std_logic_vector(resize(shift_right(resize(unsigned(window(0)),10) + resize(unsigned(window(2)),10)
+                                        + resize(unsigned(window(6)),10) + resize(unsigned(window(8)),10), 2), 8));      --calculate red
+                    when others =>
+                        output_green <= x"00"; output_red <= x"00"; output_blue <= x"00";
+                end case;
+                
+                valid_out <= '1';
+             end if;
+          end if;
+      end process new_calc;
+            
+end behavioral;
