@@ -35,6 +35,25 @@ Schematic:
 <img width="1555" height="717" alt="Screenshot 2026-05-07 144727" src="https://github.com/user-attachments/assets/b719051c-473d-4dda-856f-cddfa798dafa" />
 
 
+Simulation Screenshots:
+
+<img width="1566" height="730" alt="Screenshot 2026-05-07 151338" src="https://github.com/user-attachments/assets/898a51c8-fa8a-46b1-9edb-b3d6da811407" />
+The systems starts operation. Arrival of the 'new_image' and first 'valid_in' signals.
+
+<img width="1558" height="730" alt="Screenshot 2026-05-07 151439" src="https://github.com/user-attachments/assets/ae8d2473-c403-4e3f-88c1-d7cf534f0cbd" />
+After 2*N+2+2 cycles, the first output pixel is ready.
+
+<img width="1554" height="719" alt="Screenshot 2026-05-07 151512" src="https://github.com/user-attachments/assets/3e867d55-3647-4824-b6e2-e1c42677a414" />
+We can see that even if the valid_in signal (that the filter receives from the external device, indicating that the input pixel is valid and allowing the filter to receive it) is '0', the system just stalls until is becomes '1' (until a valid pixel arrives).
+
+<img width="1544" height="705" alt="Screenshot 2026-05-07 152020" src="https://github.com/user-attachments/assets/30729da0-b6b4-45ad-90bf-dfde8c3f289b" />
+The systems finishes it's operation and the 'image_finished' signal is raised.
+
+
+
+
+
+
 
 
 
